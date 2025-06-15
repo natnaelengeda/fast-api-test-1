@@ -10,18 +10,23 @@ from models.resumes import Resume
 # db
 from db import get_session, Base, engine
 
-# .env
-from dotenv import load_dotenv
-import os
-
-
-
-# SQL
-
-load_dotenv()
-
+# Create Database
+# Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
+
+@app.get("/resumes")
+async def get_all_resumes(db: Session = Depends(get_session)):
+  db_resumes = db.query(Resume).all()  # Use .all() to fetch all records
+  return {"resumes": db_resumes}
+
+@app.get("/resume/{email}")
+async def get_resume_by_email(email: str, db: Session = Depends(get_session)):
+  db_resume_by_email = db.query(Resume).filter(Resume.email == email).first()
+  if not db_resume_by_email:
+    raise HTTPException(status_code=404, detail="Resume not found")
+  return {"resume": db_resume_by_email}
+  
 
 @app.post("/upload-resume/", response_model= UploadResumeOut)
 async def upload_resume(file: UploadFile = File(...), db:Session=Depends(get_session)):
@@ -37,22 +42,22 @@ async def upload_resume(file: UploadFile = File(...), db:Session=Depends(get_ses
     
     structured_data = extract_entities(text)
 
-    db_resume = db.query(Resume).filter(Resume.email == structured_data.email).first()
+    db_resume = db.query(Resume).filter(Resume.email == structured_data['email']).first()
 
     if db_resume:
       raise HTTPException(status_code=400, detail="Email already exists")
     
-    # new_resume=Resume(
-    #   name=structured_data.name.strip().title(), 
-    #   email=structured_data.email,
-    #   phone=structured_data.phone,
-    #   skills=structured_data.skills,
-    #   education=structured_data.education,
-    #   experience=structured_data.experience,
-    #   raw_text=structured_data.raw_text,
-    # )
-    # db.add(new_resume)
-    # db.commit()
-    # db.refresh(new_resume)
+    new_resume=Resume(
+      name=structured_data['name'].strip().title(), 
+      email=structured_data['email'],
+      phone=structured_data['phone'],
+      skills=structured_data['skills'],
+      education=structured_data['education'],
+      experience=structured_data['experience'],
+      # raw_text=structured_data['raw_text'],
+    )
+    db.add(new_resume)
+    db.commit()
+    db.refresh(new_resume)
 
-    return {"extracted_text": structured_data }
+    return {"extracted_text": structured_data , "msg": "Success"}

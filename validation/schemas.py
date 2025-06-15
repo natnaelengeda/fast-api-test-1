@@ -12,6 +12,7 @@ class UploadResume(BaseModel):
 
 class UploadResumeOut(BaseModel):
   msg: str
+  extracted_text: dict
   
   class Config:
-    orm_mode=True
+    from_attributes=True
