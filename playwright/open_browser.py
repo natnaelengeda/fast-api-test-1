@@ -31,7 +31,7 @@ def login_and_save(context):
 
 def main():
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
+        browser = p.chromium.launch(headless=True)
 
         if os.path.exists(STORAGE_FILE):
             context = browser.new_context(storage_state=STORAGE_FILE)
@@ -44,49 +44,57 @@ def main():
         page = context.new_page()
         page.goto(LOGIN_URL)
 
+            
         page.wait_for_selector("li[id^='job-item']")
-        first_job = page.query_selector("li[id^='job-item']")
+        
+        job_elements = page.query_selector_all("li[id^='job-item']")
 
-        # experience_years_el = first_job.query_selector("xpath=//span[contains(text(), 'year of experience')]")
-        # experience_years = experience_years_el.inner_text().strip() if experience_years_el else ""
+        all_jobs = []
 
-        info_items = first_job.query_selector_all("div.fw-medium span.text-nowrap")
+        for job in job_elements:
+            info_items = job.query_selector_all("div.fw-medium span.text-nowrap")
 
-        # Default empty values
-        work_type = work_place = work_ttype = experience_years = experience_text = ""
+            work_type = work_place = work_ttype = experience_years = experience_text = ""
 
-        # Fill based on order
-        if len(info_items) > 0:
-            work_type = info_items[0].inner_text().strip()
-        if len(info_items) > 1:
-            work_place = info_items[1].inner_text().strip()
-        if len(info_items) > 2:
-            work_ttype = info_items[2].inner_text().strip()
-        if len(info_items) > 3:
-            experience_years = info_items[3].inner_text().strip()
-        if len(info_items) > 4:
-            experience_text = info_items[4].inner_text().strip()
-    
-        data = {
-                "company_name": safe_inner_text(first_job, "a[data-analytics='company_page']"),
-                "views": safe_inner_text(first_job, "span:text('views')"),
-                "applications": safe_inner_text(first_job, "span:text('applications')"),
-                "post_time": safe_inner_text(first_job, "span[data-original-title]"),
-                "job_title": safe_inner_text(first_job, "a.job-item__title-link"),
+            link = job.query_selector("a.job-item__title-link")
+            href = link.get_attribute("href") if link else ""
+            full_url = f"https://djinni.co{href}" if href else ""
+
+            if len(info_items) > 0:
+                work_type = info_items[0].inner_text().strip()
+            if len(info_items) > 1:
+                work_place = info_items[1].inner_text().strip()
+            if len(info_items) > 2:
+                work_ttype = info_items[2].inner_text().strip()
+            if len(info_items) > 3:
+                experience_years = info_items[3].inner_text().strip()
+            if len(info_items) > 4:
+                experience_text = info_items[4].inner_text().strip()
+
+            data = {
+                "company_name": safe_inner_text(job, "a[data-analytics='company_page']"),
+                # "company_profile": safe_inner_text(job, "a[]"),
+                "views": safe_inner_text(job, "span:text('views')"),
+                "applications": safe_inner_text(job, "span:text('applications')"),
+                "post_time": safe_inner_text(job, "span[data-original-title]"),
+                "job_title": safe_inner_text(job, "a.job-item__title-link"),
+                "job_link": full_url,
                 "work_type": work_type,
                 "work_place": work_place,
                 "work_ttype": work_ttype,
                 "experience_years": experience_years,
                 "experience_text": experience_text,
-                "primary_content": safe_inner_text(first_job, ".js-truncated-text"),
-                }
+                "primary_content": safe_inner_text(job, ".js-truncated-text"),
+            }
+
+            all_jobs.append(data)
         
         with open("jobs.json", "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+            json.dump(all_jobs, f, ensure_ascii=False, indent=2)
 
         print(data)
 
-        input("")    
+        # input("")    
         browser.close()
 
 if __name__ == "__main__":
